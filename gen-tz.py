@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import re
 import sys
 import argparse
 import json
@@ -483,6 +484,26 @@ def make_timezones_dict():
     return result
 
 
+def print_defines(timezones_dict):
+    print("#ifndef TIMEZONE_DEFINES_H")
+    print("#define TIMEZONE_DEFINES_H\n")
+    for name, tz in timezones_dict.items():
+        def replace_minus(match):
+            if match.group(0) == '-':
+                start = match.start()
+                if start + 1 < len(name) and name[start + 1].isdigit():
+                    return '_MINUS_'
+                else:
+                    return '_'
+            else:
+                return match.group(0)
+
+        modified_name = re.sub(r'(-)', replace_minus, name).replace("/", "_").replace("+", "_PLUS_").replace(" ", "_")
+        define_name = "TIMEZONE_" + modified_name.upper()
+        print(f'#define {define_name} "{tz}"')
+    print("\n#endif // TIMEZONE_DEFINES_H")
+
+
 def print_csv(timezones_dict):
     for name, tz in timezones_dict.items():
         print('"{}","{}"'.format(name, tz))
@@ -497,11 +518,14 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-j", "--json", action="store_true", help="outputs JSON")
     group.add_argument("-c", "--csv", action="store_true", help="outputs CSV")
+    group.add_argument("-d", "--defines", action="store_true", help="outputs c++ defines")
     data = parser.parse_args()
 
     timezones = make_timezones_dict()
 
     if data.json:
         print_json(timezones)
+    elif data.defines:
+        print_defines(timezones)
     else:
         print_csv(timezones)
